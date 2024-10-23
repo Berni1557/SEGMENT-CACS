@@ -2,7 +2,7 @@
 
 This repository is the official implementation of [Automated segment-level coronary artery calcium scoring on non-contrast CT: a multi-task deep-learning approach](https://insightsimaging.springeropen.com/articles/10.1186/s13244-024-01827-0).
 
-![Segment-level coronary artery calcium scoring](segment_cacs.png.png)
+![Segment-level coronary artery calcium scoring](images/segment_cacs.png)
 
 ### Installation using conda
 The installation has been tested on Ubuntu 18.04.5 LTS.
