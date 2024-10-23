@@ -10,8 +10,8 @@ class SegmentCACSModel():
     SegmentCACS model
     """
 
-    def __init__(self, settingsfilepath, overwrite=False):
-        """ Init ALMultiTask class
+    def __init__(self):
+        """ Init SegmentCACS class
             
         :param settingsfilepath:  Filepath to settings file
         :type settingsfilepath: str
@@ -21,8 +21,6 @@ class SegmentCACSModel():
         """
 
         self.props = dict(
-            NumChannelsIn = 1,
-            NumChannelsOut = 2,
             Input_size = (512, 512, 5),
             Output_size = (512, 512, 2),
             device = 'cuda',
@@ -262,7 +260,10 @@ class SegmentCACSModel():
 
         unet = UNet()
         unet.train()
-        unet.cuda()   
+        if self.params['device']=='cuda':
+            unet.cuda()
+        else:
+            unet.cpu()
         
         # Create model
         self.model = unet
@@ -274,7 +275,7 @@ class SegmentCACSModel():
         """
         Load pretained model
         """
-        self.model.load_state_dict(torch.load(modelpath))
+        self.model.load_state_dict(torch.load(modelpath, map_location=torch.device(self.params['device'])))
         
     def predict(self, Xin):
         self.model.eval()

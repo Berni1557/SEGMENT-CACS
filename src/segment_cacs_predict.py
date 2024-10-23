@@ -18,7 +18,7 @@ from scipy.ndimage import label, generate_binary_structure
 import json
 import argparse
 import warnings
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 def computeAgatstonArtery(image, mask, spacing, slice_thickness):
     """ Compute agatston score from image and image label
@@ -149,11 +149,11 @@ def main(args):
     os.makedirs(prediction_dir, exist_ok=True)
 
     # Create model
-    model = SegmentCACSModel(args.device)
+    model = SegmentCACSModel()
     soft = nn.Softmax(dim=1)
     
     # Initialize model and parameter
-    params={'device': 'cuda'}
+    params={'device': args.device}
     model.create(params)
     Xmin = -2000
     Xmax = 1300
@@ -204,12 +204,11 @@ def main(args):
         print('Predicting CT: ' + os.path.basename(file))
         # Iterate over slices
         for s in range(slices, image_norm_ext.shape[0]-slices):
-
             # Convert to torch tensor
             s0=s-slices
             s1=s+slices+1
-            Ximage = torch.FloatTensor(image_norm_ext[s0:s1]).to('cuda')
-            Xmask = torch.FloatTensor(lesion_candidate_mask[s0:s0+1]).to('cuda')
+            Ximage = torch.FloatTensor(image_norm_ext[s0:s1]).to(args.device)
+            Xmask = torch.FloatTensor(lesion_candidate_mask[s0:s0+1]).to(args.device)
             Xin = torch.cat((Ximage, Xmask), dim=0).unsqueeze(0)
             
             # Predict CT slice
@@ -228,7 +227,9 @@ def main(args):
             Y_region_multi = torch.argmax(Y_region, dim=1)
             
             # Filter CACS predictions based on 130 HU theshold mask
-            Y_lesion_multi = Xmask*Y_lesion_multi + (1-Xmask)*torch.zeros(Y_lesion_multi.shape).cuda()
+            Y_lesion_multi = Xmask*Y_lesion_multi + (1-Xmask)*torch.zeros(Y_lesion_multi.shape)
+            if args.device=='cuda':
+                Y_lesion_multi = Y_lesion_multi.cuda()
                         
             # Fill predictions
             pred_lesion_multi[s0,:,:] = Y_lesion_multi[0,:,:].cpu()
@@ -286,7 +287,7 @@ if __name__ == '__main__':
     parser.add_argument('--device', '-gpu', type=str,
                         action='store', dest='device',
                         help='Device NO. of GPU',
-                        default=0)
+                        default='cuda')
 
     args = parser.parse_args()
     main(args)
