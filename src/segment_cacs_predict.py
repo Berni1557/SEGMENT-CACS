@@ -139,6 +139,11 @@ def readDICOM(fp):
 def main(args):
     
     print('--- Start processing ---')
+
+    if args.device=='gpu':
+        args.device='cuda'
+    else:
+        args.device='cpu'
     
     # Define directories
     data_dir = args.data_dir
@@ -164,13 +169,13 @@ def main(args):
     print('Loading model: ' + model_dir)
     model.load(model_dir)
 
-    # Load image files from data folder    
-    #files = glob(data_dir + '/*.mhd')
-    # Load image files from data folder    
+    # Load image files from data folder     
     if filetype=='mhd':
         files = glob(data_dir + '/*.mhd')
     elif filetype=='nii':
         files = glob(data_dir + '/*.nii')
+    elif filetype=='nrrd':
+        files = glob(data_dir + '/*.nrrd')
     elif filetype=='dcm':
         files = glob(data_dir + '/*')
     else:
@@ -223,11 +228,11 @@ def main(args):
                 Y_lesion[0,1:,:,:]=0
                 
             # Convert mask format
-            Y_lesion_multi = torch.argmax(Y_lesion, dim=1)
-            Y_region_multi = torch.argmax(Y_region, dim=1)
+            Y_lesion_multi = torch.argmax(Y_lesion, dim=1).to(args.device)
+            Y_region_multi = torch.argmax(Y_region, dim=1).to(args.device)
             
             # Filter CACS predictions based on 130 HU theshold mask
-            Y_lesion_multi = Xmask*Y_lesion_multi + (1-Xmask)*torch.zeros(Y_lesion_multi.shape)
+            Y_lesion_multi = Xmask*Y_lesion_multi + (1-Xmask)*torch.zeros(Y_lesion_multi.shape).to(args.device)
             if args.device=='cuda':
                 Y_lesion_multi = Y_lesion_multi.cuda()
                         
@@ -284,10 +289,10 @@ if __name__ == '__main__':
                         action='store', dest='filetype',
                         help="Filetype of the input images. Filetpye can be 'mhd', 'dcm', 'nii'", 
                         default='mhd')
-    parser.add_argument('--device', '-gpu', type=str,
+    parser.add_argument('--device', '-device', type=str,
                         action='store', dest='device',
                         help='Device NO. of GPU',
-                        default='cuda')
+                        default='gpu')
 
     args = parser.parse_args()
     main(args)

@@ -17,19 +17,20 @@ pip install -r requirements.txt
 
 To predict the model in the paper, copy  all non-contrast enhanced cardiac CT into the data folder. 
 To run the script, you can run the segmentcacs.sh script or run the python script in the terminal directly.
+Suported file types: 'mhd', 'dcm', 'nii', 'nrrd'
 
 GPU-Version
 ```
-python segment_cacs_predict.py -m <path_to_pretrained_model> -d <path_to_data_folder> -p <path_to_prediction_folder> -f mhd -gpu cuda
+python segment_cacs_predict.py -m <path_to_pretrained_model> -d <path_to_data_folder> -p <path_to_prediction_folder> -f mhd -device cuda
 ```
 CPU-Version
 ```
-python segment_cacs_predict.py -m <path_to_pretrained_model> -d <path_to_data_folder> -p <path_to_prediction_folder> -f mhd -gpu cpu
+python segment_cacs_predict.py -m <path_to_pretrained_model> -d <path_to_data_folder> -p <path_to_prediction_folder> -f mhd -device cpu
 ```
 
 Prediction of dicom files: The folder in <path_to_data_folder> should contain dicom series folders (a dicom series is a folder containing all the dicom files (.dcm) of a scan).
 ```
-python segment_cacs_predict.py -m <path_to_pretrained_model> -d <path_to_data_folder> -p <path_to_prediction_folder> -f dcm -gpu cuda
+python segment_cacs_predict.py -m <path_to_pretrained_model> -d <path_to_data_folder> -p <path_to_prediction_folder> -f dcm -device cuda
 ```
 
 ## Pre-trained Models
