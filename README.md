@@ -32,6 +32,38 @@ Prediction of dicom files: The folder in <path_to_data_folder> should contain di
 ```
 python segment_cacs_predict.py -m <path_to_pretrained_model> -d <path_to_data_folder> -p <path_to_prediction_folder> -f dcm -device cuda
 ```
+### Docker
+
+To use docker, build and run the docker file.
+
+#### Linux
+
+Build docker:
+```
+docker build -t segmentcacs .
+```
+Run docker cpu:
+```
+docker run --rm --mount type=bind,src=/mnt/HHD/data/SegmentCACSSeg/docker/code/src/data,dst=/app/data --user "$(id -u):$(id -g)" -it segmentcacs
+```
+Run docker gpu:
+```
+docker run --rm --gpus 1 --mount type=bind,src=/mnt/HHD/data/SegmentCACSSeg/docker/code/src/data,dst=/app/data --user "$(id -u):$(id -g)" -it segmentcacs --device gpu
+```
+
+#### Windows
+Build docker:
+```
+docker build -t segmentcacs .
+```
+Run docker cpu:
+```
+docker run --rm --gpus 1 --mount type=bind,src=C:/docker_test/code/data,dst=/app/data -it segmentcacs
+```
+Run docker gpu:
+```
+docker run --rm --gpus 1 --mount type=bind,src=C:/docker_test/code/data,dst=/app/data -it segmentcacs --device gpu
+```
 
 ## Pre-trained Models
 

@@ -18,6 +18,7 @@ from scipy.ndimage import label, generate_binary_structure
 import json
 import argparse
 import warnings
+from skimage import morphology
 #import matplotlib.pyplot as plt
 
 def computeAgatstonArtery(image, mask, spacing, slice_thickness):
@@ -139,7 +140,8 @@ def readDICOM(fp):
 def main(args):
     
     print('--- Start processing ---')
-
+    
+    # Set device
     if args.device=='gpu':
         args.device='cuda'
     else:
@@ -149,6 +151,7 @@ def main(args):
     data_dir = args.data_dir
     model_dir = args.model_dir
     prediction_dir = args.prediction_dir
+    use_zero_module = args.use_zero_module
 
     # Create directories
     os.makedirs(prediction_dir, exist_ok=True)
@@ -163,11 +166,13 @@ def main(args):
     Xmin = -2000
     Xmax = 1300
     slices = 2
+    size_min = 3
     filetype = args.filetype
     
     # Load pretrained model parameter
     print('Loading model: ' + model_dir)
     model.load(model_dir)
+    model.model.eval()
 
     # Load image files from data folder     
     if filetype=='mhd':
@@ -195,25 +200,23 @@ def main(args):
         # Normalize image data
         image[image==-3024]=-2048
         image_norm = (image - Xmin) / (Xmax - Xmin)
-        image_norm_ext = np.zeros((image_norm.shape[0]+2*slices, image_norm.shape[1], image_norm.shape[2]))
-        image_norm_ext[slices:-slices] = image_norm
         
         # Lesion candidate mask
-        lesion_candidate_mask = np.zeros(image.shape)
-        lesion_candidate_mask[image>130] = 1
+        cand = image>130
+        lesion_candidate_mask = morphology.remove_small_objects(cand, size_min+1, connectivity=2)*1
         
         # Init predictions
         pred_lesion_multi = np.zeros(image.shape)
         pred_region_multi = np.zeros(image.shape)
         
         print('Predicting CT: ' + os.path.basename(file))
-        # Iterate over slices
-        for s in range(slices, image_norm_ext.shape[0]-slices):
+        for s in range(slices, image_norm.shape[0]-slices):
+            print(s)
             # Convert to torch tensor
             s0=s-slices
             s1=s+slices+1
-            Ximage = torch.FloatTensor(image_norm_ext[s0:s1]).to(args.device)
-            Xmask = torch.FloatTensor(lesion_candidate_mask[s0:s0+1]).to(args.device)
+            Ximage = torch.FloatTensor(image_norm[s0:s1]).to(args.device)
+            Xmask = torch.FloatTensor(lesion_candidate_mask[s:s+1]).to(args.device)
             Xin = torch.cat((Ximage, Xmask), dim=0).unsqueeze(0)
             
             # Predict CT slice
@@ -222,10 +225,11 @@ def main(args):
             Y_region = soft(Y_region)
             Y_zero = soft(Y_zero)
             
-            # Delete calcifications in slice if ZERO CAC model predects no CACS
-            if Y_zero[0][0]>0.5:
-                Y_lesion[0,0,:,:]=1
-                Y_lesion[0,1:,:,:]=0
+            # Delete calcifications in slice if ZERO CAC model predicts no CACS
+            if use_zero_module:
+                if Y_zero[0][0]>0.5:
+                    Y_lesion[0,0,:,:]=1
+                    Y_lesion[0,1:,:,:]=0
                 
             # Convert mask format
             Y_lesion_multi = torch.argmax(Y_lesion, dim=1).to(args.device)
@@ -237,8 +241,8 @@ def main(args):
                 Y_lesion_multi = Y_lesion_multi.cuda()
                         
             # Fill predictions
-            pred_lesion_multi[s0,:,:] = Y_lesion_multi[0,:,:].cpu()
-            pred_region_multi[s0,:,:] = Y_region_multi[0,:,:].cpu()
+            pred_lesion_multi[s,:,:] = Y_lesion_multi[0,:,:].cpu()
+            pred_region_multi[s,:,:] = Y_region_multi[0,:,:].cpu()
             
         print('Saveing predictions from: ' + os.path.basename(file))
 
@@ -247,7 +251,7 @@ def main(args):
         Y_region_sitk = sitk.GetImageFromArray(pred_region_multi)
         Y_region_sitk.CopyInformation(image_sitk)
         sitk.WriteImage(Y_region_sitk, filepath, True)
-        
+
         filepath = os.path.join(prediction_dir, filename + '_multi_lesion.nrrd')
         Y_lesion_multi_sitk = sitk.GetImageFromArray(pred_lesion_multi)
         Y_lesion_multi_sitk.CopyInformation(image_sitk)
@@ -276,23 +280,30 @@ if __name__ == '__main__':
     parser.add_argument('--model_dir', '-m', type=str,
                         action='store', dest='model_dir',
                         help='Directory of the model', 
-                        default='/mnt/SSD2/cloud_data/Projects/CTP/src/modules/SegmentCACSSeg/github/model/SegmentCACS_0001619_unet.pt')
+                        default='/mnt/HHD/data/SegmentCACSSeg/docker/code/src/data/model/SegmentCACS_0001103_unet.pt')
     parser.add_argument('--data_dir', '-d', type=str,
                         action='store', dest='data_dir',
                         help='Directory of data',
-                        default='/mnt/SSD2/cloud_data/Projects/CTP/src/modules/SegmentCACSSeg/github/data')
+                        default='/mnt/HHD/data/SegmentCACSSeg/docker/code/src/data/images')
     parser.add_argument('--prediction_dir', '-p', type=str,
                         action='store', dest='prediction_dir',
                         help='Directory of predictions',
-                        default='/mnt/SSD2/cloud_data/Projects/CTP/src/modules/SegmentCACSSeg/github/predict')
+                        default='/mnt/HHD/data/SegmentCACSSeg/docker/code/src/data/predictions')
     parser.add_argument('--filetype', '-f', type=str,
                         action='store', dest='filetype',
                         help="Filetype of the input images. Filetpye can be 'mhd', 'dcm', 'nii'", 
                         default='mhd')
     parser.add_argument('--device', '-device', type=str,
                         action='store', dest='device',
-                        help='Device NO. of GPU',
-                        default='gpu')
+                        help='Gan be gpu or cpu',
+                        default='cpu')
+    parser.add_argument('--use_zero_module', '-z', type=bool,
+                        action='store', dest='use_zero_module',
+                        help='Use Zero CAC module',
+                        default=False)
+    
 
     args = parser.parse_args()
+    print('args', args)
     main(args)
+
