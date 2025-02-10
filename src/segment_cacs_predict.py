@@ -21,7 +21,7 @@ import warnings
 from skimage import morphology
 #import matplotlib.pyplot as plt
 
-def computeAgatstonArtery(image, mask, spacing, slice_thickness):
+def computeAgatstonArtery(image, mask, spacing):
     """ Compute agatston score from image and image label
 
     :param image: Image
@@ -30,12 +30,10 @@ def computeAgatstonArtery(image, mask, spacing, slice_thickness):
     :type imageLabel: np.ndarray
     :param spacing: image spacing e.g. (0.39, 0.39, 3.0)
     :type spacing: Tuple
-    :param slice_thickness: Slice thickness
-    :type slice_thickness: float
     """
     
     # Compute overall agatston
-    agatston = computeAgatston(image, mask, spacing, slice_thickness)
+    agatston = computeAgatston(image, mask, spacing)
     
     # Compute agatston per segment
     arteries={'LM': 1, 'LAD-PROXIMAL': 2, 'LAD-MID': 3, 'LAD-DISTAL': 4, 'LAD-SIDE': 5,
@@ -45,7 +43,7 @@ def computeAgatstonArtery(image, mask, spacing, slice_thickness):
     for key in arteries:
         mask_art = np.zeros(mask.shape)
         mask_art[mask==arteries[key]]=1
-        agatston_art = computeAgatston(image, mask_art, spacing, slice_thickness)
+        agatston_art = computeAgatston(image, mask_art, spacing)
         agatston['Agatston'+key] = agatston_art['AgatstonScore']
     return agatston
 
@@ -84,7 +82,7 @@ def CACSGrading(value):
         grading=(0, 'zero')
     return grading
 
-def computeAgatston(image, mask, spacing, slice_thickness):
+def computeAgatston(image, mask, spacing):
     """ Compute agatston score from image and image label
 
     :param image: Image
@@ -103,7 +101,7 @@ def computeAgatston(image, mask, spacing, slice_thickness):
     mask_comp, num_comp = label(maskbin)
     # Compute parameters
     pixelArea = spacing[0]*spacing[1]
-    ratio = slice_thickness/spacing[2]
+    ratio = spacing[2]/3.0
     agatstonAll = 0
     agatston=dict()
     for c in range(1,num_comp+1):
@@ -120,7 +118,7 @@ def computeAgatston(image, mask, spacing, slice_thickness):
             dfactor = densityFactor(attenuation)
             # Calculate agatston score for a lesion
             agatstonLesionSlice = area * dfactor
-            # Scale agatston score based on slice_thickness
+            # Scale agatston score based on slice spacing (Note, can be different than dicom tag SliceThickness)
             agatstonLesionSlice = agatstonLesionSlice * ratio
             agatstonAll = agatstonAll + agatstonLesionSlice
     agatston['AgatstonScore'] = agatstonAll
@@ -260,9 +258,8 @@ def main(args):
         # Compute and save Agatston score per segment
         filepath = os.path.join(prediction_dir, filename + '_agatston.json')
         image_org = sitk.GetArrayFromImage(image_sitk)
-        slice_thickness = image_sitk.GetSpacing()[2]
         spacing = image_sitk.GetSpacing()
-        agatston = computeAgatstonArtery(image_org, pred_lesion_multi, spacing=spacing, slice_thickness=slice_thickness)
+        agatston = computeAgatstonArtery(image_org, pred_lesion_multi, spacing=spacing)
         with open(filepath, 'w') as f:
             json.dump(agatston, f, indent=4)
             
