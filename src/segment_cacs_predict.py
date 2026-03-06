@@ -101,7 +101,7 @@ def computeAgatston(image, mask, spacing):
     mask_comp, num_comp = label(maskbin)
     # Compute parameters
     pixelArea = spacing[0]*spacing[1]
-    ratio = spacing[2]/3.0
+    ratio = spacing[2]/3.0 # Update ratio
     agatstonAll = 0
     agatston=dict()
     for c in range(1,num_comp+1):
